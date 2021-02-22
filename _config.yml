@@ -13,14 +13,12 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: MM
-email:
+title: SYCL is hip.
+email: aksel.alpay@uni-heidelberg.de
 description: >- # this means to ignore newlines until "baseurl:"
-  Write an awesome description for your new site here. You can edit this
-  line in _config.yml. It will appear in your document head meta (for
-  Google search results) and in your feed.xml site description.
-twitter_username: username
-github_username: username
+  All things hipSYCL. Maintained by the hipSYCL development team.
+twitter_username: illuhad
+github_username: illuhad
 minimal_mistakes_skin: default
 search: true
 
@@ -31,7 +29,7 @@ remote_theme: mmistakes/minimal-mistakes
 permalink: /:categories/:title/
 paginate: 5 # amount of posts to show
 paginate_path: /page:num/
-timezone: # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+timezone: Europe/Berlin
 
 include:
   - _pages
@@ -58,34 +56,25 @@ plugins:
   - jekyll-include-cache
 
 author:
-  name   : "First Lastname"
-  avatar : "/assets/images/bio-photo.jpg"
-  bio    : "My awesome biography constrained to a sentence or two goes here."
+  name   : "Aksel Alpay"
+  avatar : "/assets/images/avatar-aksel.png"
+  bio    : "hipSYCL and HPC @ Heidelberg University"
   links:
-    - label: "Website"
-      icon: "fas fa-fw fa-link"
-      url: "https://"
     - label: "Twitter"
       icon: "fab fa-fw fa-twitter-square"
-      url: "https://twitter.com/"
+      url: "https://twitter.com/illuhad"
     - label: "GitHub"
       icon: "fab fa-fw fa-github"
-      url: "https://github.com/"
-    - label: "Instagram"
-      icon: "fab fa-fw fa-instagram"
-      url: "https://instagram.com/"
+      url: "https://github.com/illuhad"
 
 footer:
   links:
     - label: "Twitter"
       icon: "fab fa-fw fa-twitter-square"
-      url: "https://twitter.com/"
+      url: "https://twitter.com/illuhad"
     - label: "GitHub"
       icon: "fab fa-fw fa-github"
-      url: "https://github.com/"
-    - label: "Instagram"
-      icon: "fab fa-fw fa-instagram"
-      url: "https://instagram.com/"
+      url: "https://github.com/illuhad/hipSYCL"
 
 defaults:
   # _posts
@@ -105,7 +94,7 @@ defaults:
       type: pages
     values:
       layout: single
-      author_profile: true
+      author_profile: false
 
 category_archive:
   type: liquid

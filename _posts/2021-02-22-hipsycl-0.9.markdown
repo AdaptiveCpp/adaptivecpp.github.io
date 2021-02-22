@@ -1,0 +1,171 @@
+---
+layout: single
+title:  "hipSYCL 0.9.0 - SYCL 2020 and oneAPI DPC++ features coming to hipSYCL"
+date:   2021-02-22 13:38:06 +0100
+categories: hipsycl sycl2020 release
+---
+
+On december 10 2020, hipSYCL 0.9.0 was [released](https://github.com/illuhad/hipSYCL/releases/tag/v0.9.0). This release is is significant for several reasons. As we are now on the final trajectory to releasing hipSYCL 0.9.1 as another big update, I felt that is is useful to take a step back and look at some of the highlights of what is already in 0.9.0 - ready for everybody to use.
+
+# Support for key SYCL 2020 features
+
+hipSYCL 0.9.0 is the first release that incorporates [features](https://github.com/hipSYCL/featuresupport) from the SYCL 2020 specification. 
+
+SYCL 2020 is a major update on the older SYCL 1.2.1. Its highlights include a substantial amount of features that originally came from oneAPI DPC++ and have since been contributed to the SYCL 2020 specification. In particular, this includes:
+* *Unified shared memory*, a pointer-based memory management interface as an alternative to the buffer-accessor model;
+* *Parallel reductions*;
+* *subgroups* that can expose the inner workings of the hardware below work group level;
+* Optimized *work group and subgroup primitives* such as reductions or scans;
+* *in-order queues* and the ability to explicitly specify dependencies in the DAG;
+* *Unnamed kernel lambdas* reduce verbosity and simplify development.
+
+These are important features, as they allow more control over the hardware, enable more flexible usage patterns, or can reduce verbosity for programmers. It is therefore important that these features are well supported across implementations, such that developers can rely on them without limiting code portability.
+
+This is why we felt that it is was important for hipSYCL 0.9.0 to move towards SYCL 2020. Developers can now write code using SYCL 2020 features with say, DPC++ and maybe initially target Intel devices, but then seamlessly transition to using hipSYCL when, for example, AMD GPUs need to be targeted.
+
+Of course, switching between multiple implementations as needed is something that only works because SYCL is an open standard. Without open standards, it is difficult to imagine ecosystems with multiple strong implementations, and the SYCL implementation ecosystem serves as a great example of the power of standards - both in terms of the extremely broad hardware range that SYCL implementations target in summary, but also because of the various design differences between SYCL implementations which provides each one with unique strengths and weaknesses. For each use case, there is most likely a SYCL implementation that is a great fit or was maybe even designed explicitly with that use case in mind.
+
+## Code example with SYCL 2020
+
+In the past SYCL was sometimes criticized for being too verbose. The following example uses unified shared memory, unnamed kernel lambdas and queue shortcuts from SYCL 2020. It's hard to figure out how this code could be any *less* verbose.
+
+{% highlight cpp %}
+#include <iostream>
+#include <SYCL/sycl.hpp>
+
+int main() {
+  sycl::queue q;
+  
+  const std::size_t size = 4096;
+  int *shared_allocation = sycl::malloc_shared<int>(size, q);
+
+  q.parallel_for(sycl::range{size}, [=](sycl::id<1> idx) {
+    // Do some meaningful computation here instead of this :-)
+    size_t gid = idx.get(0);
+    shared_allocation[gid] = gid;
+  });
+
+  q.wait();
+
+  // Access result of your computation here
+  for(std::size_t i = 0; i < size; ++i)
+    std::cout << shared_allocation[i] << std::endl;
+  
+  sycl::free(shared_allocation, q);
+}
+
+{% endhighlight %}
+
+With hipSYCL 0.9.0, this kind of code works on all hardware that it supports: Any CPU, NVIDIA GPUs and AMD GPUs.
+
+*(As a sidenote, it's important to realize that the ability to write such code does not mean that the old buffer-accessor model is obsolete and should never be used again - it is still great if you require the features that the buffer-accessor model additionally and automatically provides. For example, the buffer-accessor model provides automatic task graph construction which allows for automatic overlap of data transfers and kernels.)*
+
+# New runtime and architecture
+
+hipSYCL 0.9.0 is also the first release containing a new runtime library, entirely rewritten from scratch. As part of this work, so much of hipSYCL was changed and restructured that working with it now really *feels* like a completely different SYCL implementation. If you have some experience with the earlier 0.8 series, now might be a good time to check on hipSYCL again.
+
+Looking at the stats between the previous release, 0.8.2, and 0.9.0 shows that pretty much every file was modified, with a net increase of almost 20000 lines of code.
+
+```
+$ git diff v0.8.2 v0.9.0 --stat
+...
+289 files changed, 28297 insertions(+), 11641 deletions(-)
+```
+
+This new runtime library was redesigned from the ground with a multi-backend architecture in mind that allows using multiple backends simultaneously, with the final goal of being able to compile source files to a single binary that can run on all of hipSYCL targets: CPUs, NVIDIA GPUs and AMD GPUs. This is in contrast to earlier hipSYCL versions, where the user had to decide at compile time which backend was targeted.
+
+While hipSYCL 0.9.0 contains all the necessary runtime and SYCL kernel header support to target all backends simultaneously, it still misses some compiler components. As a consequence, hipSYCL 0.9.0 can target CPUs and *either* AMD *or* NVIDIA GPUs at the same time.
+
+As the last missing piece of the puzzle, the required compiler support will be part of hipSYCL 0.9.1, and is in fact already merged and available in the `develop` branch on github. In short: If you install the latest hipSYCL git version, you will already be able to compile to a single binary that can run on CPUs, NVIDIA GPUs, and AMD GPUs.
+
+To express the ability to target multiple backends simultaneously, hipSYCL 0.9.0 deprecates the old `--hipsycl-platform` and `--hipsycl-gpu-arch` arguments and introduces a new, unified way to specify compilation targets using the new `--hipsycl-targets` argument. For example, to compile kernels for the OpenMP CPU backend as well as AMD gfx906 chips (Radeon VII/Instinct MI50 GPUs), the compiler argument `--hipsycl-targets=omp;hip:gfx906` can be used.
+
+The new runtime also introduces a lot of other features, such as memory management at a granularity below buffer size, and a different model for SYCL queues. These features are mainly important for future development and, at least for now, have limited impact for end users. The [release page](https://github.com/illuhad/hipSYCL/releases/tag/v0.9.0) lists some more features.
+
+# Big performance improvements for nd_range parallel_for on CPUs
+
+One of the more apparent improvements is the performance of `nd_range` `parallel_for` on CPUs. `nd_range` `parallel_for` is notoriously difficult to implement for pure-library CPU backends such as hipSYCL's OpenMP backend, because the `nd_range` model allows for explicit work group barriers and collective group algorithms. This in turn requires independent forward-progress guarantees for each work item, which does not map well to CPUs - at least with the methods that pure C++ provides.
+
+In hipSYCL 0.9.0, we transition from using threads for work items to a hybrid approach where multithreading is only used across work groups, and work items are represented using fibers (lightweight userspace threads with cooperative scheduling).
+
+As an additional optimization, hipSYCL first attempts to execute a work group with a single fiber and a  loop across work items, which might be vectorized by the compiler. Only when independent forward progress for work items is actually needed, for example when a work group barrier or collective group algorithm is encountered, will hipSYCL dynamically switch to a model where each work item is mapped to its own fiber. 
+If no barrier is encountered, performance is similar to hierarchical or basic parallel for execution models that can be implemented very efficiently in pure-library SYCL implementation backends.
+
+Overall, compared to hipSYCL 0.8.0, performance can increase by several orders of magnitude for typical workloads.
+
+# Extensions
+
+hipSYCL 0.9.0 also introduces a couple of new SYCL extensions, most notably a new execution model: Scoped parallelism allows for a performance portable formulation of kernels across backends that still provides access to lower-level features such as local memory or work group barriers that are otherwise only available in `nd_range` parallel for. See the [documentation](https://github.com/illuhad/hipSYCL/blob/develop/doc/scoped-parallelism.md) for more information. 
+In short, the idea behind scoped parallelism is to distinguish between a user-requested *logical parallelism* within a work group that describes the number of work items that should be processed in a group, and an implementation-provided *physical parallelism* which refers to the actual work group parallelism running in the backend. In scoped parallelism, the SYCL implementation will decide on a degree of physical parallelism that is well suited for the hardware, and then distribute the logical work items across the physical resources. The additional freedom for the SYCL implementation to choose the actual work group parallelism is what makes this execution model more performance portable than `nd_range` parallel for.
+
+As a brief teaser, this is what work group reduction using local memory looks like in scoped parallelism:
+
+{% highlight cpp %}
+
+#include <SYCL/sycl.hpp>
+
+int main(){
+  
+  sycl::queue q;
+  
+  std::size_t input_size = 1024;
+  int *data = sycl::malloc_shared<int>(input_size, q);
+  
+  for(int i = 0; i < input_size; ++i)
+    data[i] = i;
+  
+  constexpr size_t Group_size = 128;
+  q.parallel(
+    //number of groups
+    sycl::range<1>{input_size / Group_size},
+    sycl::range<1>{Group_size}, //logical group size
+    [=](sycl::group<1> grp, 
+        sycl::physical_item<1> physical_idx){
+      // Code in this scope is executed
+      // within the implementation-defined
+      // physical iteration space.
+
+      // Local memory can be allocated using the
+      // sycl::local_memory extension.
+      sycl::local_memory<int [Group_size]> scratch{grp};
+      
+      // `distribute_for` distributes the logical,
+      // user-provided iteration space across the
+      // physical one from the outer scope
+      grp.distribute_for([&](sycl::sub_group sg,
+                             sycl::logical_item<1> idx){
+          scratch[idx.get_local_id(0)] =
+                data[idx.get_global_id(0)];
+      }); 
+      // implicit barrier here
+
+      for(int i = Group_size / 2; i > 0; i /= 2){
+        grp.distribute_for([&](sycl::sub_group sg,
+                               sycl::logical_item<1> idx){
+          size_t lid = idx.get_local_id(0);
+          if(lid < i)
+            scratch[lid] += scratch[lid+i];
+        });
+      }
+      
+      grp.single_item([&](){
+        data[grp.get_id(0)*Group_size] = scratch[0];
+      });
+    });
+  });
+  
+  // Use results here
+  // ...
+  sycl::free(data, q);
+}
+
+{% endhighlight %}
+
+Scoped parallelism can be implemented both on top of `nd_range` parallel for for backends that support it well, as well as on top of hierarchical parallel for from SYCL 1.2.1. It can therefore be seen as a generalization or abstraction of both models.
+
+*(Note: We might adapt the interface of scoped parallelism slightly in the future to align better with some of the patterns found in the final SYCL 2020 specification)*
+
+# Get it!
+
+If I have piqued your interest in hipSYCL, head over to the [github repository](https://github.com/illuhad/hipSYCL) and download the [release](https://github.com/illuhad/hipSYCL/releases/tag/v0.9.0), or for even more new features, clone the repository from the `develop` branch!
+

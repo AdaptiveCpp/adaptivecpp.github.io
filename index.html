@@ -1,7 +1,35 @@
 ---
-# You don't need to edit this file, it's empty on purpose.
-# Edit theme's home layout instead if you wanna make some changes
-# See: https://jekyllrb.com/docs/themes/#overriding-theme-defaults
-layout: home
-author_profile: true
+layout: splash
+permalink: /
+header:
+  overlay_color: "#5e616c"
+  overlay_image: /assets/images/splash.png
+  cta_label: "<i class='fa fa-download'></i> Get hipSYCL"
+  cta_url: "https://github.com/illuhad/hipSYCL"
+  caption: 
+excerpt: 'All things hipSYCL.'
+feature_row:
+  - image_path: /assets/images/logo-color.png
+    title: "The code on GitHub"
+    excerpt: "All hipSYCL development is open source. Get the code, file bug reports or contribute."
+    url: "https://github.com/illuhad/hipSYCL"
+    btn_label: "Source Repository"
+  - image_path: /assets/images/arrow.png
+    title: "Track hipSYCL implementation progress"
+    excerpt: "See the implementation progress of SYCL 2020 features in hipSYCL."
+    url: "https://github.com/hipSYCL/featuresupport"
+    btn_label: "Learn More"
+  - image_path: /assets/images/empty-logo-frame.png
+    alt: "customizable"
+    title: "Blog posts"
+    excerpt: "Read the latest hipSYCL-related blog posts."
+    url: "/posts"
+    btn_label: "Learn More"
+intro:
+  - excerpt: ''
+author_profile: false
 ---
+
+{% include feature_row id="intro" type="center" %}
+
+{% include feature_row %}

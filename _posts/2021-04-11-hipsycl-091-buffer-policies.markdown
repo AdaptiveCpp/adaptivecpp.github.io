@@ -192,7 +192,7 @@ buffer<T, Dim> make_async_view(
 
 /// Additional factory functions exist for 
 /// buffer-USM interoperability.
-/// Those be covered in more detail in a future blog post.
+/// Those will be covered in more detail in a future blog post.
 
 {% endhighlight %}
 

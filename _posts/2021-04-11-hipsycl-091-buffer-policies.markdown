@@ -9,7 +9,7 @@ This post is part of a series where we discuss some features of the brandnew hip
 
 # Asynchronous buffers and explicit buffer policies
 
-This is a new extension in hipSYCL that can make code using `sycl::buffer` objects **much clearer while also improving performance**. Insterested? Then this blog post is for you.
+This is a new extension in hipSYCL that can make code using `sycl::buffer` objects **much clearer while also improving performance**. Interested? Then this blog post is for you.
 
 ## Motivation 1: Buffers are complicated
 
@@ -17,7 +17,7 @@ A `sycl::buffer` is a very complicated object. Depending on a combination of mul
 
 I have frequently noticed users getting this wrong. This can either lead to correctness issues, for example
 * the buffer operates directly on the input pointer, while the user has only intended to provide it as a source of initial data and wanted to reuse it after buffer construction
-* No writeback is issued even though the user expected data to be copied back to host.
+* no writeback is issued even though the user expected data to be copied back to host.
 
 Or performance bugs might be introduced - these are arguably even worse because you might not notice them right away and they might be difficult to find. Some performance bugs that I have seen in user code are:
 * The buffer issued an unexpected writeback, and thus copied data back to host without the user intending it

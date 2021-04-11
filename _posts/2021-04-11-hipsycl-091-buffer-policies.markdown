@@ -78,7 +78,7 @@ To address both the destructor antipattern as well as the complexity of buffers,
 
 For example, a `sync_writeback_view` refers to the behavior where the destructor blocks (`sync`), a writeback will be issued in the destructor (`writeback`)  and the buffer will operate directly on provided input data pointers (`view`).
 
-These behaviors are not expressed as new C++ types, but as regular `sycl::buffer` ojects that are initialized with special buffer properties. buffers with explicit behaviors are constructed using factory functions such as  `buffer<T, Dim> make_sync_buffer(...)`.
+These behaviors are not expressed as new C++ types, but as regular `sycl::buffer` objects that are initialized with special buffer properties. buffers with explicit behaviors are constructed using factory functions such as  `buffer<T, Dim> make_sync_buffer(...)`.
 Since these functions still return a `sycl::buffer<T, Dim>`, explicit buffer behaviors integrate well with existing SYCL code that relies on the `sycl::buffer` type.
 
 Using those factory functions instead of directly constructing `sycl::buffer` objects significantly improves code clarity - the programmer can now see with one quick glance at the function call what is going to happen, and what performance implications there are.

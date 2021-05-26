@@ -1,0 +1,11 @@
+Aksel Alpay:
+  name   : "Aksel Alpay"
+  avatar : "/assets/images/avatar-aksel.png"
+  bio    : "hipSYCL and HPC @ Heidelberg University"
+  links:
+    - label: "Twitter"
+      icon: "fab fa-fw fa-twitter-square"
+      url: "https://twitter.com/illuhad"
+    - label: "GitHub"
+      icon: "fab fa-fw fa-github"
+      url: "https://github.com/illuhad"

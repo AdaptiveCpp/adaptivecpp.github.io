@@ -1,0 +1,169 @@
+---
+layout: single
+title:  "hipSYCL 0.9.2 - compiler-accelerated CPU backend, nvc++ support and more"
+date:   2022-03-11 21:30:00 +0100
+categories: hipsycl release cpu extension nvc++
+---
+
+In february this year, hipSYCL 0.9.2 was [released](https://github.com/illuhad/hipSYCL/releases/tag/v0.9.2). This release includes major new features, some of which I want to discuss here.
+
+# Compiler-accelerated CPU support
+
+One of the major features of hipSYCL 0.9.2 is dedicated compiler support for the CPU backend. This can inrease performance by several orders of magnitudes in some cases, and deliver high performance on *any* CPU supported by LLVM. This is big news in the SYCL ecosystem, because until now, affected code could only be run efficiently on CPUs if an OpenCL implementation existed for the particular CPU.
+
+Let me describe what this is about:
+
+## Previous support: Library-only CPU backend
+
+hipSYCL's CPU backend has traditionally been implemented as an OpenMP library. Consequently, it can be used with any OpenMP C++ compiler, which can be a portability advantage - it allows us to run SYCL code on *any* CPU for which an OpenMP compiler exists. Practically, this is everywhere.
+
+The backend can provide good performance for kernels written in SYCL's high-level `parallel_for(sycl::range<Dimension>, Kernel)` model. However, the lower-level `parallel_for(sycl::nd_range<Dimension>, Kernel)` model is quite different: While the high-level `parallel_for` does not allow for work group barriers to occur, the `nd_range` model allows users to have explicit barriers in their code:
+
+{% highlight cpp %}
+#include <sycl/sycl.hpp>
+
+int main() {
+  sycl::queue q;
+  
+  std::size_t global_size = 1024;
+  std::size_t local_size = 128;
+  
+  q.parallel_for(sycl::nd_range<1>{global_size, local_size}, 
+    [=](auto idx) {
+    // Code before barrier here
+    
+    // Waits until all items from the work group have
+    // executed the previous code
+    sycl::group_barrier(idx.get_group());
+    
+    // Code after the barrier here - will be executed 
+    // once *all* items in the group
+    // have finished the previous code.
+  });
+
+  q.wait();
+}
+{% endhighlight %}
+
+On CPU, for performance we generally want to employ multithreading across work groups, and then iterate across work items within a group. Ideally, the compiler can then (auto-)vectorize this inner loop across work items. This maps well to hierachical parellelism from SYCL 1.2.1, or hipSYCL's [scoped parallelism](https://github.com/illuhad/hipSYCL/blob/develop/doc/scoped-parallelism.md) programming model extension.
+
+For `nd_range` barriers however, all code for all items in a group needs to finish before we can proceed. 
+This is an issue for library implementations of SYCL, because it prevents us from implementing work items as iterations of an (auto-vectorized) loop. Instead, each work item must live within its own mechanism that provides concurrency, so that all work items can reach the barrier at the same time. hipSYCL uses fibers for this purpose. While fibers have much lower overhead compared to actual full-blown threads, there are still issues with this approach:
+
+* A barrier requires context-switching through all fibers to make sure they have reached the barrier. A fiber context switch is effectively a switch to a different stack. The relative cost of this operation is much higher compared to a barrier on e.g. a GPU, so typical GPU fine-grained parallelism patterns will not run efficiently on CPUs with this model. This is a performance portability issue.
+* Additionally, code cannot be vectorized across multiple fibers since each fiber runs independently. Therefore, there is no vectorization across work items. Code that wants to benefit from vectorization has to explicitly employ inner loops for each work item that can be vectorized, e.g. by using the `sycl::vec` class. This is another performance portability issue, since this is not how typical GPU code is written.
+
+## Alternative SYCL implementations: CPU support via OpenCL
+
+So how do other SYCL implementations solve this issue? It is clear that if we can transform the kernel to something like this, the problem is solved:
+
+{% highlight cpp %}
+#include <sycl/sycl.hpp>
+
+int main() {
+  sycl::queue q;
+  
+  std::size_t global_size = 1024;
+  std::size_t group_size = 128;
+  
+  // Parallelize across work groups
+  q.parallel_for(sycl::range<1>{global_size/group_size}, 
+    [=](auto group_idx) {
+    // Compiler should vectorize this loop
+    for(int work_item = 0; i < group_size; ++work_item){
+      // Code before barrier here
+    }
+    // The barrier is now a no-op since the loop already guarantees
+    // barrier semantics
+    // sycl::group_barrier(idx.get_group());
+    
+    // Compiler should vectorize this loop
+    for(int work_item = 0; i < group_size; ++work_item){
+      // Code after barrier here
+    }
+  });
+
+  q.wait();
+}
+{% endhighlight %}
+
+*Remark: This effectively means automatically transforming nd_range kernels to patterns that resembles SYCL hierarchical parallelism or hipSYCL scoped parallelism models*
+
+And this transformation is basically what existing CPU OpenCL implementations do when compiling code. Since other SYCL implementations such as DPC++ oder ComputeCpp mostly rely on OpenCL to deliver performance on CPUs, these SYCL implementations have effectively offloaded the issue to the OpenCL implementation.
+
+However, there is one problem: There are very few CPU vendors that actually provide an OpenCL implementation for their hardware. So, unless we are only interested in running on Intel CPUs, we can have a portability issue at our hand.
+Additionally, what if we don't want to use OpenCL as SYCL runtime backend, but OpenMP, or TBB for CPUs? Wouldn't it make sense to pull the required compiler transformations from the OpenCL layer into the layer of the SYCL compiler?
+
+## Our solution: Combining the advantages of both
+
+This is exactly what we have done in hipSYCL. We have integrated these compiler transformations into the hipSYCL infrastructure. If this feature is enabled, it will apply those transformations to the regular host compilation pass - which currently uses OpenMP, but could just as well work with other runtimes such as TBB.
+
+The consequence: We can support efficient `nd_range` parallel for on any CPU supported by LLVM. No need for an OpenCL implementation anymore, as the transformations run as part of clang's regular compilation for the host CPU.
+
+If you want to use this feature, you can just pass `omp.accelerated` as target to the `--hipsycl-targets` argument. Details on using it can be found [here](https://github.com/illuhad/hipSYCL/blob/develop/doc/using-hipsycl.md).
+
+More technical details on how it works *exactly* can be found [here](https://github.com/illuhad/hipSYCL/blob/develop/doc/compilation.md#compiler-support-to-accelerate-nd_range-parallel_for-on-cpus-ompaccelerated).
+
+And [benchmark results](https://github.com/illuhad/hipSYCL/pull/682) can be found in the original pull request.
+
+## Immediate support for new NVIDIA hardware: NVC++ backend
+
+Another large, new feature in hipSYCL 0.9.2 is nvc++ support. We have added `cuda-nvcxx` as an option that can be passed to `--hipsycl-targets`. In this case, the nvc++ compilation flow is activated, in which hipSYCL acts as a regular CUDA library for nvc++ - without any compiler magic.
+
+Since nvc++ is part of NVIDIA's HPC SDK, and hence an officially supported compiler from NVIDIA, this means that with hipSYCL's nvc++ backend, it is possible to use hipSYCL on NVIDIA GPUs with the very latest CUDA versions, or latest hardware from day one after release.
+
+Currently, all SYCL implementations with CUDA backends (including hipSYCL) rely on clang, which may not always support the latest CUDA versions immediately, or just assumes that they behave similarly as older versions. With hipSYCL's nvc++ backend, the SYCL ecosystem becomes independent of the CUDA support level in clang.
+
+Additionally, the nvc++ backend does not require LLVM at all. Therefore, if only the nvc++ backend is required, hipSYCL can now be deployed [without LLVM dependency](https://github.com/illuhad/hipSYCL/blob/develop/doc/install-cuda.md#if-using-nvc). This can significantly simplify deployment e.g. on existing NVIDIA HPC systems, where nvc++ and the NVIDIA HPC SDK might already be preinstalled. Just point hipSYCL to nvc++ and you are good to go.
+
+nvc++ works slightly differently on a technical level compared to clang-based compilation flows. clang parses source code multiple times (for host and all targeted devices). Macros can then be used to detect which compilation pass currently takes place, and code paths can be specialized accordingly.
+nvc++ on the other hand parses the code only once. It is therefore not possible in nvc++ to use macros to detect e.g. whether host or device is currently targeted.
+*Note: This behavior does not violate the SYCL specification, which defines both the Single-source multiple compiler pass (SMCP) and single-source single compiler pass (SSCP) models. SMCP is what clang does, while nvc++ follows SSCP.*
+
+Consequently, the recommended way to detect the targeted backend in source code is no longer using macros such as `__SYCL_DEVICE_ONLY__`. Instead, we have introduced the `__hipsycl_if_target` mechanism which generalizes both to the clang as well as nvc++ cases. See [here](https://github.com/illuhad/hipSYCL/blob/develop/doc/macros.md#macros-to-specialize-code-paths-based-on-backend) for details.
+
+## Scoped parallelism v2
+
+Scoped parallelism is a hipSYCL-specific programming model that is designed to expose all the low-level control that the `nd_range` parallel for model provides, while additionally remaining more performance portable. This affects in particular library-only compilation flows, such as hipSYCL's OpenMP backend when the new `omp.accelerated` flow is not used.
+
+hipSYCL has already had the scoped parallelism programming model in earlier versions. hipSYCL 0.9.2 cranks it up to the next level and significantly improves and extends the model ([documentation](https://github.com/illuhad/hipSYCL/blob/develop/doc/scoped-parallelism.md)).
+For example, it now allows the implementation to expose structure below sub-group granularity by allowing infinite nesting of groups - even in multiple dimensions.
+
+Here is an example:
+
+{% highlight cpp %}
+
+sycl::queue q;
+
+q.parallel(
+  sycl::range{global_range / local_range}, sycl::range{local_range},
+  [=](auto group) {
+    // Optionally, groups can be decomposed into subunits
+    sycl::distribute_groups(group, [&](auto subgroup) {
+      // This can be nested arbitrarily deep
+      sycl::distribute_groups(subgroup, [&](auto subsubgroup) {
+        sycl::distribute_items(subsubgroup, [&](s::s_item<Dim> idx) {
+          // execute code for each work item
+        });
+        // Explicit group barriers and group algorithms are allowed
+        sycl::group_barrier(subgroup);
+      });
+    });
+  });
+
+{% endhighlight %}
+
+Details and more examples can be found in the [documentation](https://github.com/illuhad/hipSYCL/blob/develop/doc/scoped-parallelism.md).
+
+
+## But wait, there's more!
+
+hipSYCL 0.9.2 contains more new features, such as 
+* `atomic_ref`
+* better explicit multipass support
+* New extensions such as asynchronous buffers
+* More :-)
+
+The release can be found [here](https://github.com/illuhad/hipSYCL/releases/tag/v0.9.2). Of course, you can also always just clone the latest develop branch for even more new features and fixes!
+
+

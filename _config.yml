@@ -13,10 +13,10 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: SYCL is hip.
+title: Open SYCL is open.
 email: aksel.alpay@uni-heidelberg.de
 description: >- # this means to ignore newlines until "baseurl:"
-  All things hipSYCL. Maintained by the hipSYCL development team.
+  All things OpenSYCL. Maintained by the OpenSYCL development team.
 twitter_username: illuhad
 github_username: illuhad
 minimal_mistakes_skin: default

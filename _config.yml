@@ -13,10 +13,10 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: Open SYCL is open.
+title: AdaptiveCpp. The independent, community-driven platform for heterogeneous programming in C++
 email: aksel.alpay@uni-heidelberg.de
 description: >- # this means to ignore newlines until "baseurl:"
-  All things Open SYCL. Maintained by the Open SYCL development team.
+  All things AdaptiveCpp. Maintained by the AdaptiveCpp development team.
 twitter_username: illuhad
 github_username: illuhad
 minimal_mistakes_skin: default
@@ -63,7 +63,7 @@ footer:
       url: "https://twitter.com/illuhad"
     - label: "GitHub"
       icon: "fab fa-fw fa-github"
-      url: "https://github.com/illuhad/hipSYCL"
+      url: "https://github.com/illuhad"
 
 defaults:
   # _posts

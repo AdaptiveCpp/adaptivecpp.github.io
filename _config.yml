@@ -13,10 +13,10 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: AdaptiveCpp. The independent, community-driven platform for heterogeneous programming in C++
+title: AdaptiveCpp.
 email: aksel.alpay@uni-heidelberg.de
 description: >- # this means to ignore newlines until "baseurl:"
-  All things AdaptiveCpp. Maintained by the AdaptiveCpp development team.
+   The independent, community-driven platform for heterogeneous programming in C++
 twitter_username: illuhad
 github_username: illuhad
 minimal_mistakes_skin: default

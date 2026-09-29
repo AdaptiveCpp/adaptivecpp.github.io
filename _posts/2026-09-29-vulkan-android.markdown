@@ -9,7 +9,7 @@ author: Ewan Crawford
 SYCL's promise is performance portability: write modern C++ once and execute across many different accelerators. But that
 promise only goes as far as the available backends. While desktop and HPC platforms capitalize on established OpenCL,
 CUDA, HIP, and Level Zero backends for accelerating SYCL applications on the GPU, mobile isn't a domain commonly associated
-with SYCL. Yet almost every Android device ships with a capable Vulkan implementation, making it an unfulfilled chapter of
+with SYCL. Yet almost every Android device ships with a capable Vulkan implementation, making mobile an unfulfilled chapter of
 the SYCL performance portability story.
 
 While projects such as [Sylkan](https://dl.acm.org/doi/10.1145/3456669.3456683) have demonstrated that SYCL over Vulkan is
@@ -43,7 +43,7 @@ it uses a monotonically increasing 64-bit integer value to define synchronizatio
 before reuse. What's more, a timeline semaphore can also be signaled from host or device, which is useful for reasons we'll discuss later.
 
 In our implementation each SYCL queue that is created by a user has its own timeline semaphore, with a value that is
-initialized to zero and incremented on each command submission. On a `sycl::queue::submit()` call a `vkCommandBuffer`
+initialized to zero and incremented on each command submission. Whereby on a `sycl::queue::submit()` call, a `vkCommandBuffer`
 submission is made to enqueue that work to the device. Crucially, rather than batching multiple commands into a command-buffer
 each command-buffer contains a single command, which is synchronized entirely using timeline semaphores. This allows
 each command to be uniquely identified by a queue handle and timeline value pair.
@@ -74,7 +74,7 @@ sequenceDiagram
 
 ## Buffer Device Address
 
-Memory management is where SYCL's USM abstraction and Vulkan's explicitness collide most directly. Exposing
+Memory management is where SYCL's USM abstraction and Vulkan's explicitness collide. Exposing
 USM was a problem we needed to solve that was not achieved in Sylkan or any of the OpenCL-on-Vulkan
 layered implementations to date with respect to OpenCL USM.
 
@@ -102,6 +102,9 @@ host pointer, if it was a destination memcpy operand, after the `vkCmdCopyBuffer
 This is where timeline semaphores' host signaling functionality becomes crucial! Through CPU multi-threading the runtime
 does asynchronous host side work to copy data to/from a host pointer to `VkBuffer` while respecting the SYCL command
 dependencies. Here a host worker thread is used to wait on and signal the timeline semaphore values of the queue.
+
+See the diagram below for the sequence of operations in the case that both the
+source and destination operations to a `sycl::memcpy` are host pointers.
 
 {% comment %}
 Mermaid source used to generate diagram below
@@ -359,7 +362,7 @@ OpenMP benchmark was compiled as follows:
 
 ```sh
 $ cd mandelbrot-omp
-$ $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ *.cpp -O3 -o mandelbrot-omp --target=aarch64-linux-android34 -static-libstdc++
+$ $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ *.cpp -O3 -o mandelbrot-omp-ndk --target=aarch64-linux-android34 -fopenmp=libomp --rtlib=compiler-rt -static-libstdc++
 ```
 
 Note that the SYCL benchmarks in HecBench require `-DUSE_GPU=1` to be set during compilation to enable a GPU
@@ -374,21 +377,22 @@ $ $ACPP_BIN_DIR/acpp *.cpp -O3 -o mandelbrot-gpu-ndk -DUSE_GPU=1 --target=aarch6
 $ $ACPP_BIN_DIR/acpp *.cpp -O3 -o mandelbrot-cpu-ndk --target=aarch64-linux-android34 --sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot --rtlib=compiler-rt -static-libstdc++  -resource-dir=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/ -L $ACPP_NDK_BUILD/lib
 ```
 
-The SYCL acceleration results speak for themselves, on an Android Device with a Qualcomm Snapdragon SOC with
-Adreno 750 GPU and Arm v8a we achieved a 4.4x speedup over raw OpenMP by using the GPU exposed by Vulkan.
-Taking the average parallel time over 100 iterations which is output by the benchmark, and using the median from 5 runs of the benchmark,
-we observed the following:
+The SYCL acceleration results show to merit of GPU offload, on an Android Device with a Qualcomm Snapdragon SOC with
+Adreno 750 GPU and Arm v8a we achieved a 46.5% speedup over raw OpenMP by using the GPU exposed by Vulkan.
+While using SYCL with the OpenMP backend has a 7% overhead over the raw OpenMP equivalent, which matches expectations
+from the same comparison on a desktop machine.
 
-| Benchmark                 | Average parallel time (ms) |
-| ------------------------- | -------------------------- |
-|`./mandelbrot-omp 100`     | 249                        |
-|`./mandelbrot-cpu-ndk 100` | 89                         |
-|`./mandelbrot-gpu-ndk 100` | 57                         |
+Taking the average parallel time over 1000 iterations which is output by the benchmark, we observed the following:
 
-The 2.8x speedup from the SYCL OpenMP backend over the straight OpenMP benchmark is something that's
-observable on a desktop x64 platform and not only Android. It is due to the higher parallel execution times
-in straight OpenMP than SYCL OpenMP (a statistic output by the benchmark), where the key difference is
-that SYCL is runtime JIT compiling kernels with AdaptiveCpp SSCP compilation.
+| Benchmark                  | Average parallel time (ms) |
+| -------------------------- | -------------------------- |
+|`./mandelbrot-omp-ndk 1000` | 101                        |
+|`./mandelbrot-cpu-ndk 1000` | 108                        |
+|`./mandelbrot-gpu-ndk 1000` | 54                         |
+
+*Data taken from median of 5 runs based on build with
+Adaptivecpp commit [8a75ba2410bc6fcbf2b41e4eaebaf2410c500f21](https://github.com/AdaptiveCpp/AdaptiveCpp/commit/8a75ba2410bc6fcbf2b41e4eaebaf2410c500f21)
+& Hecbench commit [8d66934f100d6d6c972ce476e7f67b3a0fdf0454](https://github.com/ORNL/HeCBench/commit/8d66934f100d6d6c972ce476e7f67b3a0fdf0454).*
 
 # Conclusion
 

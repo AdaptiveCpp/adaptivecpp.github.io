@@ -13,7 +13,7 @@ Aksel Alpay:
 Ewan Crawford:
   name   : "Ewan Crawford"
   avatar : "/assets/images/avatar-ewan.png"
-  bio    : "Khronos Compute Standards @ StreamHPC, ex-Codeplay"
+  bio    : "GPU Compute @ Stream HPC, ex-Codeplay"
   links:
     - label: "GitHub"
       icon: "fab fa-fw fa-github"

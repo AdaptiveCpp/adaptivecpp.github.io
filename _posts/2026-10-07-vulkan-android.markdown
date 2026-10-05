@@ -19,9 +19,9 @@ the SYCL performance portability story.
 
 While projects such as [Sylkan](https://dl.acm.org/doi/10.1145/3456669.3456683) have demonstrated that SYCL over Vulkan is
 feasible, the space has remained relatively unexplored in terms of feature completeness, Android support, and integration
-with the wider SYCL ecosystem. OpenCL has had more success in this area with projects such as
+with the wider SYCL ecosystem. OpenCL has had more success in this area, with projects such as
 [clvk](https://github.com/kpet/clvk), [pocl](https://github.com/pocl/pocl), and [ANGLE](https://github.com/google/angle)
-successfully layering its compute API over Vulkan.
+successfully layering the OpenCL compute API over Vulkan.
 
 AdaptiveCpp closes this SYCL gap with its new Vulkan backend and Android cross-compilation support.
 Here is what we'll cover in this blog post:
@@ -41,22 +41,21 @@ using [Mesa llvmpipe](https://docs.mesa3d.org/drivers/llvmpipe.html) for Linux a
 and [MoltenVK](https://github.com/KhronosGroup/MoltenVK) for macOS.
 
 In this article, we'll only cover how to build and use the backend on Ubuntu using a native build flow.
-Android requires a more complex build process using the Android NDK to
+Android requires a more complex build process using the Android Native Development Kit (NDK) to
 cross-compile AdaptiveCpp and other dependencies. You can find the in-depth instructions for how to do that
 [here](https://github.com/AdaptiveCpp/AdaptiveCpp/blob/develop/doc/install-android.md).
 
-## Building AdaptiveCpp With Vulkan Backend Enabled
+## Building AdaptiveCpp With The Vulkan Backend
 
 There are four main pieces to assemble before you can compile and run your first SYCL program for Vulkan: the [LunarG SDK](#lunarg-sdk),
-a [Vulkan driver](#vulkan-driver), a [clspv binary](#clspv), and [AdaptiveCpp](#adaptivecpp) itself.
-The first main build dependency is the LunarG Vulkan SDK
-which contains SPIR-V Tools, Vulkan layers and the loader, and the VulkanHpp headers. The second is a `clspv` binary itself,
-which can be built following the GitHub repo instructions. A Vulkan driver is also needed to
-run on top of. Finally, we need to build AdaptiveCpp with the Vulkan backend enabled.
+a [Vulkan driver](#vulkan-driver), the [clspv compiler](#clspv), and [AdaptiveCpp](#adaptivecpp) itself.
+The first build dependency is the LunarG Vulkan SDK which contains SPIR-V Tools, Vulkan layers and the loader, and the VulkanHpp headers.
+The second is a `clspv` executable, which can be built following the GitHub repo instructions. A Vulkan driver is also required to run the backend.
+Finally, we need to build AdaptiveCpp with the Vulkan backend enabled.
 
 ### LunarG SDK
 
-Download the Vulkan SDK Tarball from the [LunarG website](https://vulkan.lunarg.com/sdk/home) and decompress it.
+Download the Vulkan SDK tarball from the [LunarG website](https://vulkan.lunarg.com/sdk/home) and decompress it.
 The LunarG SDK can then be made available in your system path after sourcing the `setup-env.sh` script that it
 ships (we recommend automatically sourcing this as part of your `.bashrc`).
 
@@ -69,7 +68,7 @@ $ source 1.4.357.0/setup-env.sh
 ### Vulkan Driver
 
 The Vulkan SDK comes with a `vulkaninfo` tool for printing the Vulkan drivers on your system.
-At least one driver is required to use as a SYCL backend device. If you don't have any installed then the
+At least one driver is required for use as a SYCL backend device. If you don't have any installed then the
 easiest way to reliably get a supported driver is to install the Mesa drivers with
 `apt install mesa-vulkan-drivers`. This will provide at least the llvmpipe CPU Vulkan driver
 which provides all the necessary capabilities for SYCL. For example:
@@ -137,12 +136,12 @@ Loaded backend 1: Vulkan
   Found device: llvmpipe (LLVM 20.1.8, 256 bits)
 ```
 
-## Running Applications with the Vulkan Backend
+## Running Applications On The Vulkan Backend
 
 Let's build and run a simple SYCL application with AdaptiveCpp to show
 the Vulkan backend in action. All this application does is use a 1D kernel
 to initialize a device USM allocation with the index value of each element,
-then verifies on host that the device size initialization was performed correctly.
+then verifies on the host that each element was initialized with its expected value.
 
 ```cpp
 // sycl_test.cpp
@@ -180,9 +179,8 @@ int main() {
 }
 ```
 
-Once we have our compiled `sycl_test`
-binary we can run it using the `ACPP_VISIBILITY_MASK` environment variable to
-ask for the Vulkan backend as `ACPP_VISIBILITY_MASK=vk`. If there is more
+Once we have our compiled `sycl_test` binary we can run it using the `ACPP_VISIBILITY_MASK`
+environment variable to select the Vulkan backend as `ACPP_VISIBILITY_MASK=vk`. If there is more
 than one compatible Vulkan driver on your system then you can ask for a specific device
 by name. For example, here we ask for llvmpipe with `ACPP_VISIBILITY_MASK=vk:llvmpipe`.
 
@@ -197,12 +195,12 @@ SYCL application SUCCESS
 
 With the Ubuntu setup working, let's look at what this enables on Android by illustrating
 the benefits of SYCL acceleration on one of the benchmarks from
-[HecBench](https://github.com/ORNL/HeCBench). HecBench provides multiple source code variants of
+[HeCBench](https://github.com/ORNL/HeCBench). HeCBench provides multiple source code variants of
 each benchmark for different backends. We used the mandelbrot benchmark which has, among others, an OpenMP variant
 [mandelbrot-omp](https://github.com/ORNL/HeCBench/tree/master/src/mandelbrot-omp), and a SYCL variant
 [mandelbrot-sycl](https://github.com/ORNL/HeCBench/tree/master/src/mandelbrot-sycl).
 
-The benchmarks were cross-compiled using release 27 of the Android Native Development Kit (NDK). The direct
+The benchmarks were cross-compiled using release 27 of the Android NDK. The direct
 OpenMP benchmark was compiled as follows:
 
 ```
@@ -210,7 +208,7 @@ $ cd mandelbrot-omp
 $ $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ *.cpp -O3 -o mandelbrot-omp-ndk --target=aarch64-linux-android34 -fopenmp=libomp --rtlib=compiler-rt -static-libstdc++
 ```
 
-Note that the SYCL benchmarks in HecBench require `-DUSE_GPU=1` to be set during compilation to enable a GPU
+Note that the SYCL benchmarks in HeCBench require `-DUSE_GPU=1` to be set during compilation to enable a GPU
 SYCL queue selector, so for each benchmark we create two SYCL executables linked against an Android cross-compiled build of AdaptiveCpp
 `$ACPP_NDK_BUILD`. See the
 [install-android](https://github.com/AdaptiveCpp/AdaptiveCpp/blob/develop/doc/install-android.md)
@@ -219,7 +217,7 @@ doc for more details on how to achieve this.
 ```
 $ cd mandelbrot-sycl
 $ $ACPP_BIN_DIR/acpp *.cpp -O3 -o mandelbrot-gpu-ndk -DUSE_GPU=1 --target=aarch64-linux-android34 --sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot --rtlib=compiler-rt -static-libstdc++  -resource-dir=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/ -L $ACPP_NDK_BUILD/lib
-$ $ACPP_BIN_DIR/acpp *.cpp -O3 -o mandelbrot-cpu-ndk --target=aarch64-linux-android34 --sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot --rtlib=compiler-rt -static-libstdc++  -resource-dir=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/ -L $ACPP_NDK_BUILD/lib
+$ $ACPP_BIN_DIR/acpp *.cpp -O3 -o mandelbrot-cpu-ndk --target=aarch64-linux-android34 --sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot --rtlib=compiler-rt -static-libstdc++ -resource-dir=$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/ -L $ACPP_NDK_BUILD/lib
 ```
 
 The SYCL acceleration results show the merit of GPU offload. On an Android 14 device with a Qualcomm Snapdragon 8 Gen 3 SoC
@@ -237,23 +235,23 @@ Taking the average parallel time over 1000 iterations, which is output by the be
 
 *Data taken from the median of 5 runs based on a build with
 AdaptiveCpp commit [8a75ba2410bc6fcbf2b41e4eaebaf2410c500f21](https://github.com/AdaptiveCpp/AdaptiveCpp/commit/8a75ba2410bc6fcbf2b41e4eaebaf2410c500f21)
-& Hecbench commit [8d66934f100d6d6c972ce476e7f67b3a0fdf0454](https://github.com/ORNL/HeCBench/commit/8d66934f100d6d6c972ce476e7f67b3a0fdf0454).*
+& HeCBench commit [8d66934f100d6d6c972ce476e7f67b3a0fdf0454](https://github.com/ORNL/HeCBench/commit/8d66934f100d6d6c972ce476e7f67b3a0fdf0454).*
 
 # Under the Hood
 
-Now that we've seen the backend in action, let's find our how it works.
+Now that we've seen the backend in action, let's find out how it works.
 
 ## Runtime Implementation
 
 Before any kernel code runs on a device, the runtime has to do a lot of heavy lifting to map SYCL concepts like queues,
-events, and memory allocations down onto Vulkan's explicit, low-level API. To reduce implementation verbosity, the Khronos
+events, and memory allocations onto Vulkan's explicit, low-level API. To reduce implementation verbosity, the Khronos
 [VulkanHpp](https://github.com/KhronosGroup/Vulkan-Hpp) headers are used in the AdaptiveCpp source code,
 which provide useful concepts such as RAII-wrapped Vulkan object handles.
 
 Each SYCL device corresponds to a logical Vulkan device that meets the key capability criteria to implement SYCL,
 namely [Timeline Semaphores](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_timeline_semaphore.html)
 and [Buffer Device Address](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_buffer_device_address.html).
-Let's elaborate on why those extensions are necessary building blocks for our SYCL implementation.
+Let's elaborate on why these features are necessary building blocks for our SYCL implementation.
 
 ### Timeline Semaphores
 
@@ -295,15 +293,15 @@ sequenceDiagram
 ### Buffer Device Address
 
 Memory management is where SYCL's USM abstraction and Vulkan's explicitness collide. Exposing
-USM was a problem we needed to solve that had not been addressed in Sylkan or any of the OpenCL-on-Vulkan
-layered implementations to date with respect to OpenCL USM.
+USM was a problem we needed to solve that had not been addressed by Sylkan or any of the OpenCL-on-Vulkan
+implementations to date.
 
 AdaptiveCpp builds SYCL buffers on top of USM. That makes USM support fundamental to the Vulkan backend.
 There are many types of USM in SYCL, but the minimum we need to support is device USM. Device USM gives the
 user a pointer to an allocation that can be dereferenced on the device, but not dereferenced on the host,
-unlike host/shared USM types, where a pointer can be dereferenced on the host and device.
+unlike host/shared USM types, where a pointer can be dereferenced on both the host and device.
 
-Vulkan asynchronous commands operate on `VkBuffer` objects, but these are themselves backed by `VkDeviceMemory` objects
+Vulkan asynchronous commands operate on `VkBuffer` objects, which are backed by `VkDeviceMemory` objects
 that must be allocated and then bound to a `VkBuffer`. To implement USM we can't give the user a device-dereferenceable
 pointer to `VkDeviceMemory` because Vulkan only allows the memory to be mapped to a host pointer, not directly addressed
 from the device. Instead the solution is to implement device USM as a `VkBuffer` backed by `VkDeviceMemory`, and use the
@@ -320,7 +318,7 @@ which have not yet completed. Likewise, we need a way to copy the data back from
 host pointer, if it was the destination `memcpy` operand, after the `vkCmdCopyBuffer` command has completed.
 
 This is where timeline semaphores' host signaling functionality becomes crucial! Through CPU multithreading, the runtime
-does asynchronous host-side work to copy data to and from a host pointer to a `VkBuffer` while respecting the SYCL command
+does asynchronous host-side work to copy data between a host pointer and a `VkBuffer` while respecting the SYCL command
 dependencies. Here a host worker thread is used to wait on and signal the timeline semaphore values of the queue.
 
 See the diagram below for the sequence of operations in the case that both the
@@ -368,10 +366,10 @@ sequenceDiagram
 
 ## Compiler Implementation
 
-Layering the runtime is only half the battle. The real challenge begins with compiling SYCL kernels down to
-Vulkan-consumable shader SPIR-V. While SYCL kernels can already be compiled to
-SPIR-V for consumption by OpenCL and Level Zero backends, this is not the same dialect of SPIR-V that Vulkan drivers
-consume. Fortunately, there is an established tool for generating Vulkan SPIR-V from compute kernels that we
+Layering the runtime is only half the battle. The real challenge begins with compiling SYCL kernels into
+Vulkan-consumable shader SPIR-V. While SYCL kernels can already be compiled to SPIR-V for OpenCL and Level Zero backends,
+this is not the same dialect of SPIR-V that Vulkan drivers expect.
+Fortunately, there is an established tool for generating Vulkan SPIR-V from compute kernels that we
 can leverage, [clspv](https://github.com/google/clspv), which is used by all of the layered OpenCL-on-Vulkan implementations
 to compile OpenCL-C into Vulkan SPIR-V.
 
@@ -384,12 +382,12 @@ to lower LLVM-IR to kernel capability SPIR-V, and the Vulkan backend calls into 
 
 clspv is typically used with OpenCL-C input rather than C++ single-source IR, so we had to build a
 pipeline of LLVM passes for transforming the IR into a form that's consumable by clspv.
-The biggest challenge here is generic pointers which are not part of the OpenCL-C 1.2 language that clspv is
-familiar with consuming. In OpenCL-C 1.2 pointers always have an [address space qualifier](https://registry.khronos.org/OpenCL/specs/unified/html/OpenCL_C.html#address-space-qualifiers)
+The biggest challenge here is generic pointers, which are not part of the OpenCL-C 1.2 language that clspv was
+designed to handle. In OpenCL-C 1.2 pointers always have an [address space qualifier](https://registry.khronos.org/OpenCL/specs/unified/html/OpenCL_C.html#address-space-qualifiers)
 to tell the compiler if it's a `__global`, `__local`, `__constant`, or `__private` address space pointer.
 In SYCL, with the exception of the rarely used `sycl::multi_ptr`, there are no such qualifiers,
 meaning the address space of all pointers must be inferred.
-This is possible in most cases but breaks down when pointers themselves are loaded from memory, as there
+This inference is possible in most cases but breaks down when pointers themselves are loaded from memory, as there
 is no way to correctly infer the address space. So the SSCP Vulkan backend does a lot of work to try to
 restore the LLVM address space in IR, but ultimately this is a fundamental mismatch between SYCL generic
 pointers and SPIR-V.
@@ -397,7 +395,7 @@ pointers and SPIR-V.
 Once we have generated the SPIR-V for our kernels, the SPIR-V code will advertise through
 [capabilities](https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#Capabilities)
 the specific functionality that a Vulkan driver must support to run it. More advanced SYCL kernels require more capabilities,
-but the SPIR-V capabilities required to run any kernel are:
+but the SPIR-V capabilities required to run any kernel are as follows:
 
 * `physicalStorageBufferAddresses` - Use `PhysicalStorageBuffer64` memory
   model where physical pointers are allowed. This allows USM pointers to

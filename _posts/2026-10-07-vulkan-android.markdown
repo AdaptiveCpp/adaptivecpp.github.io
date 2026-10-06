@@ -68,7 +68,7 @@ $ source 1.4.357.0/setup-env.sh
 ### Vulkan Driver
 
 The Vulkan SDK comes with a `vulkaninfo` tool for printing the Vulkan drivers on your system.
-At least one driver is required for use as a SYCL backend device. If you don't have any installed then the
+At least one driver is required to use as a SYCL backend device. If you don't have any installed then the
 easiest way to reliably get a supported driver is to install the Mesa drivers with
 `apt install mesa-vulkan-drivers`. This will provide at least the llvmpipe CPU Vulkan driver
 which provides all the necessary capabilities for SYCL. For example:
@@ -193,7 +193,7 @@ SYCL application SUCCESS
 
 # Android Benchmarks
 
-With the Ubuntu setup working, let's look at what this enables on Android by illustrating
+With the Ubuntu setup working, let's look at what this enables on Android by measuring
 the benefits of SYCL acceleration on one of the benchmarks from
 [HeCBench](https://github.com/ORNL/HeCBench). HeCBench provides multiple source code variants of
 each benchmark for different backends. We used the mandelbrot benchmark which has, among others, an OpenMP variant
@@ -255,7 +255,7 @@ Let's elaborate on why these features are necessary building blocks for our SYCL
 
 ### Timeline Semaphores
 
-Synchronization in Vulkan is complicated, so we simplified everything down to use a fundamental primitive that is powerful
+Synchronization in Vulkan is complicated, so we simplified everything down to a fundamental primitive that is powerful
 but also easy to reason about, the timeline semaphore. Rather than being in a binary signaled-or-not-signaled state,
 it uses a monotonically increasing 64-bit integer value to define synchronization order, eliminating the need to be reset
 before reuse. What's more, a timeline semaphore can also be signaled from the host or device, which is useful for reasons we'll discuss later.
